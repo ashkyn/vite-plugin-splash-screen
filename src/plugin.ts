@@ -4,123 +4,98 @@ import type { PluginOption, ResolvedConfig } from "vite";
 
 type LoaderType = "line" | "dots" | "none";
 
-type LogoOptions = {
-	inline?: boolean; // whether to inline the SVG (default) or use an <object> tag (supports animation)
-	height?: number; // optional height attribute; this seems to be required if the SVG has a viewBox and no height/width attributes
-};
-
 type PluginOptions = {
-	logoSrc: string;
-	logoOptions?: LogoOptions;
-	splashBg?: string;
-	loaderBg?: string;
-	loaderType?: LoaderType;
-	minDurationMs?: number;
+  logoSrc: string;
+  splashBg?: string;
+  loaderBg?: string;
+  loaderType?: LoaderType;
+  minDurationMs?: number;
 };
 
 export function splashScreen(options: PluginOptions) {
-	if (!options.logoSrc) {
-		throw new Error(
-			"The `logoSrc` option is required for vite-plugin-splash-screen!"
-		);
-	}
+  if (!options.logoSrc) {
+    throw new Error(
+      "The `logoSrc` option is required for vite-plugin-splash-screen!"
+    );
+  }
 
-	const {
-		logoSrc,
-		minDurationMs,
-		loaderType = "line",
-		loaderBg = "#0072f5",
-		splashBg = "#ffffff",
-		logoOptions = {
-			inline: true, // default to inline SVG to preserve existing behaviour
-			height: undefined,
-		},
-	} = options;
+  const {
+    logoSrc,
+    minDurationMs,
+    loaderType = "line",
+    loaderBg = "#0072f5",
+    splashBg = "#ffffff",
+  } = options;
 
-	let config: ResolvedConfig;
+  let config: ResolvedConfig;
 
-	return {
-		name: "vite-plugin-splash-screen",
-		configResolved(resolvedConfig: any) {
-			config = resolvedConfig;
-		},
-		transformIndexHtml(html: string) {
-			const baseStyles = readPluginFile("styles.css");
+  return {
+    name: "vite-plugin-splash-screen",
+    configResolved(resolvedConfig: any) {
+      config = resolvedConfig;
+    },
+    transformIndexHtml(html: string) {
+      const baseStyles = readPluginFile("styles.css");
 
-			let loaderStyles = "";
+      let loaderStyles = "";
 
-			if (loaderType === "line") {
-				loaderStyles = readPluginFile("loaders/line.css");
-			} else if (loaderType === "dots") {
-				loaderStyles = readPluginFile("loaders/dots.css");
-			}
+      if (loaderType === "line") {
+        loaderStyles = readPluginFile("loaders/line.css");
+      } else if (loaderType === "dots") {
+        loaderStyles = readPluginFile("loaders/dots.css");
+      }
 
-			let logoHtml = "";
+      const logoHtml = fs.readFileSync(
+        path.resolve(config.publicDir, logoSrc),
+        "utf8"
+      );
 
-			if (logoOptions.inline) {
-				logoHtml = fs.readFileSync(
-					path.resolve(config.publicDir, logoSrc),
-					"utf8"
-				);
-			} else {
-				const attributes = [
-					`title="${logoSrc.split("/").pop()?.split(".")[0]}"`, // use filename as title for accessibility
-					`data="${logoSrc}"`,
-					logoOptions.height ? `height="${logoOptions.height}"` : "",
-					`type="image/svg+xml"`,
-				]
-					.filter(Boolean)
-					.join(" ");
+      const splash = splashTemplate({
+        logoHtml,
+        loaderType,
+        minDurationMs,
+      });
 
-				logoHtml = `<object ${attributes}></object>`;
-			}
-
-			const splash = splashTemplate({
-				logoHtml,
-				loaderType,
-				minDurationMs,
-			});
-
-			const styles = `
+      const styles = `
         <style id="vpss-style">
           ${baseStyles.replace("/*BG_SPLASH*/", splashBg)}
           ${loaderStyles.replace("/*BG_LOADER*/", loaderBg)}
         </style>
       `;
 
-			return (
-				html
-					// Add styles to end of head
-					.replace("</head>", `${styles}</head>`)
-					// Add splash screen to end of body
-					.replace("</body>", `${splash}</body>`)
-			);
-		},
-	} satisfies PluginOption;
+      return (
+        html
+          // Add styles to end of head
+          .replace("</head>", `${styles}</head>`)
+          // Add splash screen to end of body
+          .replace("</body>", `${splash}</body>`)
+      );
+    },
+  } satisfies PluginOption;
 }
 
 function splashTemplate({
-	logoHtml,
-	loaderType,
-	minDurationMs,
+  logoHtml,
+  loaderType,
+  minDurationMs,
 }: {
-	logoHtml: string;
-	loaderType: LoaderType;
-	minDurationMs?: number;
+  logoHtml: string;
+  loaderType: LoaderType;
+  minDurationMs?: number;
 }) {
-	/**
-	 * TODO: add more loader options.
-	 * Inspiration: https://cssloaders.github.io/
-	 */
-	let loaderHtml = "";
+  /**
+   * TODO: add more loader options.
+   * Inspiration: https://cssloaders.github.io/
+   */
+  let loaderHtml = "";
 
-	if (loaderType === "line") {
-		loaderHtml = readPluginFile("loaders/line.html");
-	} else if (loaderType === "dots") {
-		loaderHtml = readPluginFile("loaders/dots.html");
-	}
+  if (loaderType === "line") {
+    loaderHtml = readPluginFile("loaders/line.html");
+  } else if (loaderType === "dots") {
+    loaderHtml = readPluginFile("loaders/dots.html");
+  }
 
-	return /*html*/ `
+  return /*html*/ `
     <div id="vpss">
       <div class="vpss-logo">${logoHtml}</div>
       ${loaderHtml}
@@ -208,5 +183,5 @@ function splashTemplate({
 const pluginPath = "node_modules/vite-plugin-splash-screen/src";
 
 function readPluginFile(filePath: string) {
-	return fs.readFileSync(path.resolve(pluginPath, filePath), "utf8");
+  return fs.readFileSync(path.resolve(pluginPath, filePath), "utf8");
 }
