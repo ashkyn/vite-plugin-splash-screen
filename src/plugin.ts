@@ -4,8 +4,14 @@ import type { PluginOption, ResolvedConfig } from "vite";
 
 type LoaderType = "line" | "dots" | "none";
 
+type LogoOptions = {
+  inline?: boolean; // whether to inline the SVG (default) or use an <object> tag (supports animation)
+  height?: number; // optional height attribute; this seems to be required if the SVG has a viewBox and no height/width attributes
+};
+
 type PluginOptions = {
   logoSrc: string;
+  logoOptions?: LogoOptions;
   splashBg?: string;
   loaderBg?: string;
   loaderType?: LoaderType;
@@ -25,6 +31,10 @@ export function splashScreen(options: PluginOptions) {
     loaderType = "line",
     loaderBg = "#0072f5",
     splashBg = "#ffffff",
+    logoOptions = {
+      inline: true, // default to inline SVG to preserve existing behaviour
+      height: undefined,
+    },
   } = options;
 
   let config: ResolvedConfig;
@@ -45,10 +55,25 @@ export function splashScreen(options: PluginOptions) {
         loaderStyles = readPluginFile("loaders/dots.css");
       }
 
-      const logoHtml = fs.readFileSync(
-        path.resolve(config.publicDir, logoSrc),
-        "utf8"
-      );
+      let logoHtml = "";
+
+			if (logoOptions.inline) {
+				logoHtml = fs.readFileSync(
+					path.resolve(config.publicDir, logoSrc),
+					"utf8"
+				);
+			} else {
+				const attributes = [
+					`title="${logoSrc.split("/").pop()?.split(".")[0]}"`, // use filename as title for accessibility
+					`data="${logoSrc}"`,
+					logoOptions.height ? `height="${logoOptions.height}"` : "",
+					`type="image/svg+xml"`,
+				]
+					.filter(Boolean)
+					.join(" ");
+
+				logoHtml = `<object ${attributes}></object>`;
+			}
 
       const splash = splashTemplate({
         logoHtml,
